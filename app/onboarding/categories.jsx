@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { COLORS } from "../../constants/theme"
 import { CATEGORIES } from "../../constants/categories"
+import { useUserStore } from "../../stores/userStore"
 
 export default function CategoriesOnboardingScreen() {
     const [selectedCategories, setSelectedCategories] = useState([])
@@ -18,10 +19,13 @@ export default function CategoriesOnboardingScreen() {
         })
     }
 
+    const setFavoriteCategories = useUserStore((state) => state.setFavoriteCategories)
+
     const handleContinue = () => {
-        console.log('Favorite categories:', selectedCategories)
+        setFavoriteCategories(selectedCategories)
         router.replace('/home')
     }
+
 
     return (
         <ScrollView style={styles.screen} contentContainerStyle={styles.content}>

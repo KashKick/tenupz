@@ -2,14 +2,28 @@ import { useLocalSearchParams, router } from "expo-router"
 import { StyleSheet, Text, View, Pressable, ScrollView } from "react-native"
 import { ArrowRight, Flame, Share2, Trophy } from "lucide-react-native"
 import { COLORS } from "../../constants/theme"
+import { useUserStore } from "../../stores/userStore"
+import { useEffect } from "react"
+
 
 export default function ResultsScreen() {
-  const { score, xp, quizId } = useLocalSearchParams()
+  const { score, xp, quizId, attemptId } = useLocalSearchParams()
   const numericScore = Number(score || 0)
   const numericXp = Number(xp || 0)
 
   const isPerfect = numericScore === 10
   const isFirsTen = quizId === 'first-ten'
+
+  const addQuizResult = useUserStore((state) => state.addQuizResult)
+
+  useEffect(() => {
+    addQuizResult({
+        attemptId,
+        score: numericScore,
+        xpEarned: numericXp,
+        isDaily: isFirsTen,
+    })
+  }, [])
 
   const getMessage = () => {
     if (numericScore === 10) {

@@ -4,6 +4,7 @@ import { Check, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { COLORS } from "../../constants/theme";
 import { FIRST_TEN_QUESTIONS } from "../../mocks/questions";
+import { CATEGORY_QUESTIONS } from "../../mocks/categoryQuestions";
 
 const XP_VALUES = {
     easy: 25,
@@ -19,12 +20,13 @@ export default function QuizScreen() {
     const [score, setScore] = useState(0)
     const [xpEarned, setXpEarned] = useState(0)
 
-    const question = FIRST_TEN_QUESTIONS[questionIndex]
+    const questions = quizId === 'first-ten' ? FIRST_TEN_QUESTIONS : CATEGORY_QUESTIONS[quizId] || FIRST_TEN_QUESTIONS
+    const question = questions[questionIndex]
 
     const hasAnswered = selectedAnswer !== null
     const isCorrect = selectedAnswer === question.correctAnswer
 
-    const progress = ((questionIndex + 1) / FIRST_TEN_QUESTIONS.length) * 100
+    const progress = ((questionIndex + 1) / questions.length) * 100
     const handleAnswer = (answerId) => {
         if (hasAnswered) return
 
@@ -37,16 +39,17 @@ export default function QuizScreen() {
     }
 
     const handleNext = () => {
-        const isLastQuestion = questionIndex === FIRST_TEN_QUESTIONS.length - 1
+        const isLastQuestion = questionIndex === questions.length - 1
 
         if (isLastQuestion) {
+            const attemptId = `${quizId}-${Date.now()}`
             const finalScore = score
             const completionXp = 50
             const perfectBonus = finalScore === 10 ? 100 : 0
             const finalXp = xpEarned + completionXp + perfectBonus
 
             router.replace({
-                pathname: '/results/first-ten',
+                pathname: `/results/${attemptId}`,
                 params: {
                     score: String(finalScore),
                     xp: String(finalXp),
@@ -73,7 +76,7 @@ export default function QuizScreen() {
             ]
         }
 
-        if (answerId !== question.correctAnswer) {
+        if (answerId === selectedAnswer) {
             return [
                 styles.answer,
                 styles.answerIncorrect
@@ -113,7 +116,7 @@ export default function QuizScreen() {
             <View style={styles.top}>
                 <View style={styles.progressHeader}>
                     <Text style={styles.progressText}>
-                        {questionIndex + 1} / {FIRST_TEN_QUESTIONS.length}
+                        {questionIndex + 1} / {questions.length}
                     </Text>
 
                     <Text style={styles.xp}>
@@ -184,7 +187,7 @@ export default function QuizScreen() {
                     pressed && styles.nextButtonPressed,
                 ]}>
                     <Text style={styles.nextButtonText}>
-                        {questionIndex === FIRST_TEN_QUESTIONS.length - 1 ? "SEE RESULTS" : "NEXT"}
+                        {questionIndex === questions.length - 1 ? "SEE RESULTS" : "NEXT"}
                     </Text>
                 </Pressable>
             )}

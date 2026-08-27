@@ -3,8 +3,14 @@ import { Gamepad2, Play } from "lucide-react-native"
 import { ScrollView, StyleSheet, View, Text, Pressable } from "react-native"
 import { COLORS } from "../../constants/theme"
 import { CATEGORIES } from "../../constants/categories"
+import { useUserStore } from "../../stores/userStore"
 
 export default function HomeScreen() {
+    const favoriteCategories = useUserStore((state) => state.favoriteCategories)
+    const xp = useUserStore((state) => state.xp)
+    const level = useUserStore((state) => state.level)
+    const currentStreak = useUserStore((state) => state.currentStreak)
+
     const handleDailyTen = () => {
         router.push('/quiz/first-ten')
     }
@@ -22,19 +28,19 @@ export default function HomeScreen() {
 
                 <View style={styles.userStats}>
                     <Text style={styles.statText}>
-                        1 Day Streak
+                        {currentStreak} Day{currentStreak === 1 ? '' : 's'} Streak
                     </Text>
 
                     <View style={styles.dot} />
 
                     <Text style={styles.statText}>
-                        Level 1
+                        Level {level}
                     </Text>
 
                     <View style={styles.dot} />
 
                     <Text style={styles.statText}>
-                        545 XP
+                        {xp.toLocaleString()} XP
                     </Text>
                 </View>
             </View>
