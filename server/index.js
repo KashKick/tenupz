@@ -56,6 +56,56 @@ app.get('/api/games', async(req, res) => {
     }
 })
 
+app.get('/api/games/:offerId', async (req, res) => {
+    try {
+        const partnerId = process.env.BESITOS_PARTNER_ID
+        const token = process.env.BESITOS_API_TOKEN
+        const { offerId } = req.params
+
+        if (!partnerId || !token) {
+            return req.status(500).json({
+                error: 'Missing Besitos credentials'
+            })
+        }
+
+        const response = await fetch(
+            `https://wall.besitos.ai/data/partner/offers/${partnerId}?device_platform=all`,
+            {
+                headers: {
+                    accept: 'application/json',
+                    authorization: `Bearer ${token}`
+                }
+            }
+        )
+
+        if (!response.ok) {
+            return res.status(response.status).json({
+                error: `Besitos API returned ${response.status}`
+            })
+        }
+
+        const json = await response.json()
+
+        const offers = Array.isArray(json.data) ? json.data : []
+
+        const offer = offers.find((item) => item.id === offerId && item.budget_status === 'Active')
+
+        if (!offer) {
+            return res.status(404).json({
+                error: 'Offer not found'
+            })
+        }
+
+        res.json({ offer })
+
+    } catch (error) {
+        res.status(500).json({
+            error: 'Failed to reach Besitos API',
+            details: error.message
+        })
+    }
+})
+
 app.listen(PORT, () => {
     console.log(`TenUpz local API running at http://localhost:${PORT}`)
 })

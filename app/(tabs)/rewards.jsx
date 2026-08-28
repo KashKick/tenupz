@@ -3,11 +3,17 @@ import { CheckCircle2, ChevronRight, Gift, Gamepad2 } from "lucide-react-native"
 import { COLORS } from "../../constants/theme"
 import { useOffers } from "../../hooks/useOffers"
 import { formatReward } from "../../services/B2BService"
+import { router } from "expo-router"
+import Spinner from "../../components/Spinner"
+import { useChallengeStore } from "../../stores/challengeStore"
 
 export default function RewardsScreen() {
-  const activeChallenges = []
-  const completedChallenges = []
-  const { offers: recommendedOffers, loading, error } = useOffers()
+  const activeChallenges = useChallengeStore((state) => state.activeChallenges)
+  const completedChallenges = useChallengeStore((state) => state.completedChallenges)
+  const { offers, loading, error } = useOffers()
+
+  const activeIds = new Set(activeChallenges.map((challenge) => challenge.id))
+  const recommendedOffers = offers.filter((offer) => !activeIds.has(offer.id))
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -65,7 +71,7 @@ export default function RewardsScreen() {
         </View>
 
         {loading ? (
-          <EmptyCard icon={Gift} title='Loading challenges...' text='Finding eligible rewards for you.' />
+          <Spinner label='Finding eligible rewards for you.' />
         ) : error ? (
           <EmptyCard icon={Gift} title="Couldn't load rewards" text={error} />
         ) : recommendedOffers.length === 0 ? (
@@ -100,11 +106,24 @@ function EmptyCard({ icon: Icon, title, text }) {
 }
 
 function ChallengeCard({ challenge, completed = false }) {
+  const handlePress = () => {
+    router.push(`/challenge/${challenge.id}`)
+  }
+
   return (
-    <Pressable style={styles.challengeCard}>
-      <View style={styles.challengeImage}>
-        <Gamepad2 size={24} strokeWidth={2.3} color={COLORS.primary} />
-      </View>
+    <Pressable onPress={handlePress} 
+      style={({ pressed }) => [
+        styles.challengeCard,
+        pressed && styles.cardPressed
+      ]}
+      >
+      {challenge.image ? (
+        <Image source={{ uri: challenge.image }} style={styles.offerImage} />
+      ) : (
+        <View style={styles.challengeImage}>
+          <Gamepad2 size={24} strokeWidth={2.3} color={COLORS.primary} />
+        </View>
+      )}
 
       <View style={styles.challengeContent}>
         <Text style={styles.challengeTitle}>
@@ -124,8 +143,17 @@ function ChallengeCard({ challenge, completed = false }) {
 }
 
 function OfferCard({ offer }) {
+  const handlePress = () => {
+    router.push(`/challenge/${offer.id}`)
+  }
+
   return (
-    <Pressable style={styles.challengeCard}>
+    <Pressable onPress={handlePress} 
+      style={({ pressed }) => [
+        styles.challengeCard,
+        pressed && styles.cardPressed
+      ]}
+    >
       {offer.squareImage ? (
         <Image source={{ uri: offer.squareImage }} style={styles.offerImage} />
       ) : (
@@ -283,5 +311,8 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 16,
     marginRight: 14
+  },
+  cardPressed: {
+    transform: [{ translateY: 2 }]
   }
 })
