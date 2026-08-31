@@ -2,8 +2,10 @@ import { StyleSheet, Text, View, ScrollView } from "react-native"
 import { Award, Flame, Star, Target, Trophy, User } from 'lucide-react-native'
 import { COLORS } from '../../constants/theme'
 import { useUserStore } from "../../stores/userStore"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
 
 export default function ProfileScreen() {
+  const contentPadding = useScreenPadding({ top: 32 })
   const xp = useUserStore((state) => state.xp)
   const level = useUserStore((state) => state.level)
   const currentStreak = useUserStore((state) => state.currentStreak)
@@ -32,7 +34,7 @@ export default function ProfileScreen() {
   const accuracy = questionsAnswered === 0 ? 0 : Math.round((correctAnswers / questionsAnswered) * 100)
 
   return (
-    <ScrollView style={styles.scree} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
       <View style={styles.header}>
         <View style={styles.avatar}>
           <User size={34} strokeWidth={2.4} color={COLORS.primary} />

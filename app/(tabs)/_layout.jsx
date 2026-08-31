@@ -1,16 +1,19 @@
 import { Tabs } from 'expo-router'
 import { Home, Play, Gift, User, } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets()
+
   return (
     <Tabs screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#111111',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
-            height: 70,
+            height: 70 + insets.bottom,
             paddingTop: 8,
-            paddingBottom: 8,
+            paddingBottom: 8 + insets.bottom,
         },
         tabBarLabelStyle: {
             fontSize: 12,

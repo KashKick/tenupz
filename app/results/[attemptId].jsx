@@ -1,18 +1,29 @@
 import { useLocalSearchParams, router } from "expo-router"
-import { StyleSheet, Text, View, Pressable, ScrollView } from "react-native"
-import { ArrowRight, Flame, Share2, Trophy } from "lucide-react-native"
+import { StyleSheet, Text, View, Pressable, ScrollView, Share, Image } from "react-native"
+import { ArrowRight, Flame, Share2, Trophy, Gamepad2, ChevronRight } from "lucide-react-native"
 import { COLORS } from "../../constants/theme"
 import { useUserStore } from "../../stores/userStore"
-import { useEffect } from "react"
+import { useUserGames } from "../../hooks/useUserGames"
+import { formatReward } from "../../services/B2BService"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
+import { useEffect, useState } from "react"
 
 
 export default function ResultsScreen() {
+  const contentPadding = useScreenPadding({ top: 48, bottom: 48 })
   const { score, xp, quizId, attemptId } = useLocalSearchParams()
+
+  const userId = useUserStore((state) => state.userId)
+  const { available: availableOffers, loading: offersLoading} = useUserGames(userId)
+  const bonusOffer = availableOffers[0]
+  const [showBonusOffer, setShowBonusOffer] = useState(true)
+
+  const currentStreak = useUserStore((state) => state.currentStreak)
   const numericScore = Number(score || 0)
   const numericXp = Number(xp || 0)
 
   const isPerfect = numericScore === 10
-  const isFirsTen = quizId === 'first-ten'
+  const isFirstTen = quizId === 'first-ten'
 
   const addQuizResult = useUserStore((state) => state.addQuizResult)
 
@@ -21,7 +32,7 @@ export default function ResultsScreen() {
         attemptId,
         score: numericScore,
         xpEarned: numericXp,
-        isDaily: isFirsTen,
+        isDaily: isFirstTen,
     })
   }, [])
 
@@ -51,14 +62,14 @@ export default function ResultsScreen() {
     }
 
     if (numericScore >= 6) {
-        return 'Not bad. Ready for another?.'
+        return 'Not bad. Ready for another?'
     }
 
     return 'Every Ten makes you sharper.'
   }
 
   const handleContinue = () => {
-    if (isFirsTen) {
+    if (isFirstTen) {
         router.push('/onboarding/categories')
         return
     }
@@ -66,12 +77,20 @@ export default function ResultsScreen() {
     router.replace('/home')
   }
 
-  const handleShare = () => {
-    console.log('Share score')
+  const handleShare = async () => {
+    try {
+        await Share.share({
+            message:
+            `I scored ${numericScore}/10 on TenUpz!` +
+            `Think you can beat me?`
+        })
+    } catch (error) {
+        console.error('Failed to share score:', error)
+    }
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
         <View style={styles.result}>
             <View style={styles.trophy}>
                 <Trophy size={36} strokeWidth={2.5} color={COLORS.primary} />
@@ -108,7 +127,7 @@ export default function ResultsScreen() {
                     <Text style={styles.statLabel}>STREAK</Text>
                 </View>
                 <Text style={styles.statValue}>
-                    1 day
+                    {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
                 </Text>
             </View>
         </View>
@@ -132,13 +151,59 @@ export default function ResultsScreen() {
             </View>
         )}
 
+        {!offersLoading && bonusOffer && showBonusOffer && (
+            <View style={styles.bonusSection}>
+                <Text style={styles.bonusEyebrow}>
+                    BONUS CHALLENGE UNLOCKED
+                </Text>
+
+                <Pressable 
+                    onPress={() => router.push(`/challenge/${bonusOffer.id}`)}
+                    style={({ pressed }) => [
+                        styles.bonusCard,
+                        pressed && styles.bonusCardPressed
+                    ]}>
+                        {bonusOffer.squareImage ? (
+                            <Image source={{ uri: bonusOffer.squareImage}} style={styles.bonusImage} />
+                        ) : (
+                            <View style={styles.bonusIcon}>
+                                <Gamepad2 size={26} strokeWidth={2.4} color={COLORS.primary} />
+                            </View>
+                        )}
+
+                        <View style={styles.bonusContent}>
+                            <Text style={styles.bonusTitle}>
+                                {bonusOffer.title}
+                            </Text>
+
+                            <Text style={styles.bonusText}>
+                                Earn up to{' '}
+                                {formatReward(bonusOffer.currency, bonusOffer.amount)}
+                            </Text>
+                        </View>
+
+                        <ChevronRight size={20} strokeWidth={2.4} color={COLORS.textMuted} />
+                    </Pressable>
+
+                    <Pressable onPress={() => setShowBonusOffer(false)} hitSlop={10} 
+                        style={({ pressed }) => [
+                            styles.notNowButton,
+                            pressed && styles.notNowButtonPressed
+                        ]}>
+                            <Text style={styles.notNowText}>
+                                NOW NOW
+                            </Text>
+                        </Pressable>
+            </View>
+        )}
+
         <View style={styles.actions}>
             <Pressable onPress={handleContinue} style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed
             ]}>
                 <Text style={styles.primaryButtonText}>
-                    {isFirsTen ? 'CONTINUE' : 'PLAY ANOTHER'}
+                    {isFirstTen ? 'CONTINUE' : 'PLAY ANOTHER'}
                 </Text>
 
                 <ArrowRight size={20} strokeWidth={2.7} color={COLORS.surface} />
@@ -169,8 +234,7 @@ const styles = StyleSheet.create({
         maxWidth: 520,
         alignSelf: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 24,
-        paddingVertical: 48
+        paddingHorizontal: 24
     },
     result: {
         alignItems: 'center'
@@ -237,7 +301,7 @@ const styles = StyleSheet.create({
     xpValue: {
         color: COLORS.primary,
         fontSize: 28,
-        fontWeightL: '900'
+        fontWeight: '900'
     },
     statValue: {
         color: COLORS.text,
@@ -269,6 +333,20 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         fontSize: 14,
         lineHeight: 18
+    },
+    achievementIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#FFF7DD',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    achievementTitle: {
+        marginTop: 3,
+        color: COLORS.text,
+        fontSize: 17,
+        fontWeight: '900'
     },
     actions: {
         marginTop: 32,
@@ -316,5 +394,72 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '900',
         letterSpacing: 0.1
+    },
+    bonusSection: {
+        marginTop: 24
+    },
+    bonusEyebrow: {
+        marginBottom: 10,
+        color: COLORS.primary,
+        fontSize: 11,
+        fontWeight: "900",
+        letterSpacing: 0.8
+    },
+    bonusCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 16,
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+        borderRadius: 18,
+        backgroundColor: COLORS.surface
+    },
+    bonusCardPressed: {
+        transform: [{ translateY: 2 }]
+    },
+    bonusImage: {
+        width: 58,
+        height: 58,
+        borderRadius: 16,
+        marginRight: 14
+    },
+
+    bonusIcon: {
+        width: 58,
+        height: 58,
+        borderRadius: 16,
+        marginRight: 14,
+        backgroundColor: "#EEEEFF",
+        alignItems: "center",
+        justifyContent: "center"
+    },
+    bonusContent: {
+        flex: 1
+    },
+    bonusTitle: {
+        color: COLORS.text,
+        fontSize: 16,
+        fontWeight: "900"
+    },
+    bonusText: {
+        marginTop: 5,
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: "800"
+    },
+    notNowButton: {
+        alignSelf: "center",
+        marginTop: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 8
+    },
+    notNowButtonPressed: {
+        opacity: 0.6
+    },
+    notNowText: {
+        color: COLORS.textMuted,
+        fontSize: 12,
+        fontWeight: "900",
+        letterSpacing: 0.6
     },
 })

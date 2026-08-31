@@ -3,16 +3,23 @@ import { ArrowRight, Sparkles } from "lucide-react-native"
 import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native"
 import { COLORS } from "../../constants/theme"
 import { CATEGORIES } from "../../constants/categories"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
+import { useUserStore } from "../../stores/userStore"
 
 export default function PlayScreen() {
+    const contentPadding = useScreenPadding({ top: 32 })
+
     const handleCategory = (category) => {
         router.push(`/quiz/${category.id}`)
     }
 
-    const recommendedCategories = CATEGORIES.slice(0, 3)
+    const favoriteCategories = useUserStore((state) => state.favoriteCategories)
+    const recommendedCategories = favoriteCategories.length > 0 
+    ? CATEGORIES.filter((category) => favoriteCategories.includes(category.id)).slice(0, 3)
+    : CATEGORIES.slice(0, 3)
 
     return (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
             <View style={styles.header}>
                 <Text style={styles.eyebrow}>
                     PLAY

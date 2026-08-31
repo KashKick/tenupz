@@ -1,22 +1,26 @@
 import { StyleSheet, Text, View, ScrollView, Pressable, Image } from "react-native"
 import { CheckCircle2, ChevronRight, Gift, Gamepad2 } from "lucide-react-native"
 import { COLORS } from "../../constants/theme"
-import { useOffers } from "../../hooks/useOffers"
 import { formatReward } from "../../services/B2BService"
 import { router } from "expo-router"
 import Spinner from "../../components/Spinner"
-import { useChallengeStore } from "../../stores/challengeStore"
+import { useUserStore } from "../../stores/userStore"
+import { useUserGames } from "../../hooks/useUserGames"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
 
 export default function RewardsScreen() {
-  const activeChallenges = useChallengeStore((state) => state.activeChallenges)
-  const completedChallenges = useChallengeStore((state) => state.completedChallenges)
-  const { offers, loading, error } = useOffers()
-
-  const activeIds = new Set(activeChallenges.map((challenge) => challenge.id))
-  const recommendedOffers = offers.filter((offer) => !activeIds.has(offer.id))
+  const contentPadding = useScreenPadding({ top: 32 })
+  const userId = useUserStore((state) => state.userId)
+  const {
+    available: recommendedOffers,
+    inProgress: activeChallenges,
+    completed: completedChallenges,
+    loading,
+    error
+  } = useUserGames(userId)
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>
           REWARDS
@@ -110,6 +114,9 @@ function ChallengeCard({ challenge, completed = false }) {
     router.push(`/challenge/${challenge.id}`)
   }
 
+  const completedGoals = challenge.goals?.filter((goal) => goal.completed).length || 0
+  const totalGoals = challenge.goals?.length || 0
+
   return (
     <Pressable onPress={handlePress} 
       style={({ pressed }) => [
@@ -117,8 +124,8 @@ function ChallengeCard({ challenge, completed = false }) {
         pressed && styles.cardPressed
       ]}
       >
-      {challenge.image ? (
-        <Image source={{ uri: challenge.image }} style={styles.offerImage} />
+      {challenge.squareImage ? (
+        <Image source={{ uri: challenge.squareImage }} style={styles.offerImage} />
       ) : (
         <View style={styles.challengeImage}>
           <Gamepad2 size={24} strokeWidth={2.3} color={COLORS.primary} />
@@ -130,10 +137,16 @@ function ChallengeCard({ challenge, completed = false }) {
           {challenge.title}
         </Text>
         <Text style={styles.challengeMeta}>
-          {challenge.progressText}
+          {completed
+            ? 'Challenge completed'
+            : challenge.challengeStatus === 'pending'
+            ? 'Waiting for tracking...'
+            : `${completedGoals} of ${totalGoals} milestones completed`}
         </Text>
         <Text style={styles.challengeReward}>
-          {completed ? `Earned ${challenge.reward}` : `Earn up to ${challenge.reward}`}
+          {completed 
+          ? `Earned ${formatReward(challenge.currency, challenge.amount)}` 
+          : `Earn up to ${formatReward(challenge.currency, challenge.amount)}`}
         </Text>
       </View>
 

@@ -1,22 +1,30 @@
 import { useLocalSearchParams, router } from "expo-router"
-import { StyleSheet, Text, View, Image, Linking, Pressable, ScrollView } from "react-native"
-import { ArrowLeft, CheckCircle2, Circle, ExternalLink, Milestone, ChevronDown, ChevronUp } from "lucide-react-native"
+import { StyleSheet, Text, View, Image, Linking, Pressable, ScrollView, Platform } from "react-native"
+import { ArrowLeft, CheckCircle2, Circle, ExternalLink, ChevronDown, ChevronUp, XCircle } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { COLORS } from "../../constants/theme"
-import { formatReward, getOfferDetails } from "../../services/B2BService"
+import { formatReward, getUserOffer } from "../../services/B2BService"
 import Spinner from "../../components/Spinner"
 import { useChallengeStore } from "../../stores/challengeStore"
+import { useUserStore } from "../../stores/userStore"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
 
 export default function ChallengeScreen() {
+  const contentPadding = useScreenPadding({ top: 24, bottom: 60 })
+  const statePadding = useScreenPadding({ top: 24, bottom: 24 })
   const { offerId } = useLocalSearchParams()
   const [offer, setOffer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showAllMilestones, setShowAllMilestones] = useState(false)
 
-  const startChallenge = useChallengeStore((state) => state.startChallenge)
-  const activeChallenges = useChallengeStore((state) => state.activeChallenges)
-  const isActive = activeChallenges.some((challenge) => challenge.id === offer?.id)
+  const userId = useUserStore((state) => state.userId)
+
+  const markChallengeLaunched = useChallengeStore((state) => state.markChallengeLaunched)
+  const launchedChallenges = useChallengeStore((state) => state.launchedChallenges)
+  const isLocallyLaunched = launchedChallenges.some((challenge) => challenge.id === offer?.id)
+
+  const platform = Platform.OS === 'ios' ? 'ios' : 'android'
 
   useEffect(() => {
     let alive = true
@@ -26,7 +34,9 @@ export default function ChallengeScreen() {
         setLoading(true)
         setError(null)
 
-        const result = await getOfferDetails(offerId)
+        if (!userId) return
+
+        const result = await getUserOffer(userId, offerId, { platform, country: 'US'})
 
         if (alive) setOffer(result)
 
@@ -43,19 +53,21 @@ export default function ChallengeScreen() {
     loadOffer()
 
     return () => { alive = false }
-  }, [offerId])
+  }, [offerId, userId])
 
-  const handleStart = async () => {
+  const handleChallengePress = async () => {
     if (!offer?.url) return
 
-    startChallenge(offer)
+    if (offer.challengeStatus === 'available' && !isLocallyLaunched) {
+      markChallengeLaunched(offer)
+    }
 
     await Linking.openURL(offer.url)
   }
 
   if (loading) {
     return (
-      <View style={styles.stateScreen}>
+      <View style={[styles.stateScreen, statePadding]}>
         <Spinner />
       </View>
     )
@@ -63,7 +75,7 @@ export default function ChallengeScreen() {
 
   if (error || !offer) {
     return (
-      <View style={styles.stateScreen}>
+      <View style={[styles.stateScreen, statePadding]}>
         <Text style={styles.stateTitle}>
           Couldn't load challenge
         </Text>
@@ -82,7 +94,7 @@ export default function ChallengeScreen() {
   const hasMoreGoals = offer.goals.length > 4
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <ArrowLeft size={20} strokeWidth={2.4} color={COLORS.text} />
       </Pressable>
@@ -151,14 +163,44 @@ export default function ChallengeScreen() {
         </View>
       </View>
 
-      <Pressable onPress={handleStart} 
+      {/* {offer.description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            ABOUT THIS CHALLENGE
+          </Text>
+
+          <Text style={styles.bodyText}>
+            {stripHtml(offer.description)}
+          </Text>
+        </View>
+      )}
+
+      {offer.details && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            REQUIREMENTS
+          </Text>
+
+          <Text style={styles.bodyText}>
+            {stripHtml(offer.details)}
+          </Text>
+        </View>
+      )} */}
+
+      <Pressable 
+        disabled={offer.challengeStatus === 'completed'}
+        onPress={handleChallengePress} 
         style={({ pressed }) => [
           styles.startButton,
-          pressed && styles.startButtonPressed
+          offer.challengeStatus === 'completed' && styles.startButtonCompleted,
+          pressed && offer.challengeStatus !== 'completed' && styles.startButtonPressed
         ]}
       >
         <Text style={styles.startButtonText}>
-          {isActive ? 'CONTINUE CHALLENGE' : 'START CHALLENGE'}
+          {offer.challengeStatus === 'completed'
+            ? 'CHALLENGE COMPLETED'
+            : offer.challengeStatus === 'active' || isLocallyLaunched
+            ? 'CONTINUE CHALLENGE' : 'START CHALLENGE'}
         </Text>
         <ExternalLink size={20} strokeWidth={2.4} color={COLORS.surface} />
       </Pressable>
@@ -168,27 +210,57 @@ export default function ChallengeScreen() {
 
 function MilestoneRow({ goal }) {
   return (
-    <View style={styles.milestoneRow}>
+    <View style={[
+      styles.milestoneRow,
+      goal.completed && styles.milestoneCompleted,
+      goal.failed && styles.milestoneFailed
+    ]}>
       <View style={styles.milestoneIcon}>
-        <Circle size={20} strokeWidth={2.2} color={COLORS.textMuted} />
+        {goal.completed ? (
+          <CheckCircle2 size={20} strokeWidth={2.2} color={COLORS.success} />
+        ) : goal.failed ? (
+          <XCircle size={20} strokeWidth={2.2} color={COLORS.error} />
+        ) : (
+          <Circle size={20} strokeWidth={2.2} color={COLORS.textMuted} />
+        )}
       </View>
 
       <View style={styles.milestoneContent}>
-        <Text style={styles.milestoneText}>
+        <Text style={[
+          styles.milestoneText,
+          goal.completed && styles.milestoneTextCompleted,
+          goal.failed && styles.milestoneTextFailed
+        ]}>
           {goal.text}
         </Text>
-        {goal.daysLeft != null && (
+        {goal.daysLeft != null && !goal.completed && (
           <Text style={styles.milestoneMeta}>
             {goal.daysLeft} days left
           </Text>
         )}
       </View>
 
-      <Text style={styles.milestoneReward}>
+      <Text style={[
+        styles.milestoneReward,
+        goal.completed && styles.milestoneRewardCompleted
+        ]}>
         {formatReward(goal.currency, goal.amount)}
       </Text>
     </View>
   )
+}
+
+function stripHtml(value = '') {
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<li>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .trim()
 }
 
 const styles = StyleSheet.create({
@@ -370,5 +442,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5
+  },
+  milestoneCompleted: {
+    borderColor: COLORS.success
+  },
+  milestoneFailed: {
+    borderColor: COLORS.error
+  },
+  milestoneTextCompleted: {
+    color: COLORS.success
+  },
+  milestoneTextFailed: {
+    color: COLORS.error
+  },
+  milestoneRewardCompleted: {
+    color: COLORS.success
+  },
+  startButtonCompleted: {
+    backgroundColor: COLORS.success,
+    borderBottomColor: COLORS.success,
+    opacity: 0.8
+  },
+  bodyText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    lineHeight: 22
   }
 })

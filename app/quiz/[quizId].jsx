@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { COLORS } from "../../constants/theme";
 import { FIRST_TEN_QUESTIONS } from "../../mocks/questions";
 import { CATEGORY_QUESTIONS } from "../../mocks/categoryQuestions";
+import { useScreenPadding } from "../../hooks/useScreenPadding";
 
 const XP_VALUES = {
     easy: 25,
@@ -13,6 +14,7 @@ const XP_VALUES = {
 }
 
 export default function QuizScreen() {
+    const contentPadding = useScreenPadding({ top: 32, bottom: 48 })
     const { quizId } = useLocalSearchParams()
 
     const [questionIndex, setQuestionIndex] = useState(0)
@@ -112,7 +114,7 @@ export default function QuizScreen() {
     }
 
     return (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
             <View style={styles.top}>
                 <View style={styles.progressHeader}>
                     <Text style={styles.progressText}>

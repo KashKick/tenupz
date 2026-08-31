@@ -1,14 +1,17 @@
 import { router } from 'expo-router'
 import { StyleSheet, Text, View, Pressable, } from 'react-native'
 import { COLORS } from '../constants/theme'
+import { useScreenPadding } from '../hooks/useScreenPadding'
 
 export default function WelcomeScreen() {
+    const screenPadding = useScreenPadding({ top: 24, bottom: 24 })
+
     const handleStart = () => {
         router.push("/quiz/first-ten")
     }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, screenPadding]}>
         <View style={styles.content}>
             <View style={styles.logoBadge}>
                 <Text style={styles.logoMark}>10</Text>

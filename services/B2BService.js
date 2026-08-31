@@ -1,3 +1,5 @@
+import { applyDevSimulation } from "./devChallengeSimulation"
+
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || ""
 
 export function normalizeOffer(offer) {
@@ -30,6 +32,11 @@ export function normalizeOffer(offer) {
       daysLeft: goal.days_left,
       section: goal.section,
       position: goal.position,
+      completed: Boolean(goal.completed),
+      failed: Boolean(goal.failed),
+      completedDatetime: goal.completed_datetime || null,
+      expiresAt: goal.expires_at || null,
+      expireDatetime: goal.expire_datetime || null
     })),
   }
 }
@@ -118,4 +125,61 @@ export async function getOfferDetails(offerId) {
     const json = await response.json()
 
     return normalizeOffer(json.offer)
+}
+
+export async function getUserGames(userId, { platform = 'android', country = 'US' } = {}) {
+    const params = new URLSearchParams({
+        platform,
+        country
+    })
+
+    const response = await fetch(
+        `${API_BASE}/api/user-games/${encodeURIComponent(userId)}?${params.toString()}`,
+        {
+            headers: {
+                accept: 'application/json'
+            }
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(
+            'Unable to load rewards right now'
+        )
+    }
+
+    return response.json()
+}
+
+export async function getUserOffer(userId, offerId, options = {}) {
+    const data = await getUserGames(userId, options)
+
+    const available = Array.isArray(data.available) ? data.available : []
+    const inProgress = Array.isArray(data.inProgress) ? data.inProgress : []
+    const completed = Array.isArray(data.completed) ? data.completed : []
+    
+    const simulated = applyDevSimulation({ available, inProgress, completed })
+    const completedOffer = simulated.completed.find((offer) => offer.id === offerId)
+    
+    if (completedOffer) {
+        return { ...completedOffer, challengeStatus: 'completed'}
+    }
+
+    const activeOffer = simulated.inProgress.find(
+        (offer) => offer.id === offerId
+    )
+
+    if (activeOffer) {
+        return { ...activeOffer, challengeStatus: 'active'}
+    }
+
+    const availableOffer = simulated.available.find(
+        (offer) => offer.id === offerId
+    )
+
+    if (availableOffer) {
+        return { ...availableOffer, challengeStatus: 'available'}
+    }
+
+    throw new Error('Offer not found for user')
 }

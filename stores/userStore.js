@@ -1,6 +1,25 @@
+import * as Crypto from "expo-crypto"
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 import Storage from "./storage"
+
+const USER_STORE_VERSION = 1
+
+const INITIAL_USER_STATE = {
+    userId: null,
+    xp: 0,
+    level: 1,
+    currentStreak: 0,
+    longestStreak: 0,
+    lastDailyPlayed: null,
+    favoriteCategories: [],
+    questionsAnswered: 0,
+    correctAnswers: 0,
+    tensCompleted: 0,
+    perfectTens: 0,
+    rewardsEarned: 0,
+    completedAttemptIds: []
+}
 
 const getLevelFromXp = (xp) => {
     return Math.floor(xp / 1000) + 1
@@ -23,19 +42,23 @@ const getYesterdayDateString = () => {
 
 export const useUserStore = create(
     persist(
-        (set) => ({
-            xp: 0,
-            level: 1,
-            currentStreak: 0,
-            longestStreak: 0,
-            lastDailyPlayed: null,
-            favoriteCategories: [],
-            questionsAnswered: 0,
-            correctAnswers: 0,
-            tensCompleted: 0,
-            perfectTens: 0,
-            rewardsEarned: 0,
-            completedAttemptIds: [],
+        (set, get) => ({
+            ...INITIAL_USER_STATE,
+
+            ensureUserId: () => {
+              const currentUserId = get().userId
+              
+              if (currentUserId) return currentUserId
+
+              const newUserId = Crypto.randomUUID()
+
+              set({
+                userId: newUserId
+              })
+
+              return newUserId
+            },
+
             addQuizResult: ({
                 attemptId,
                 score,
@@ -104,24 +127,26 @@ export const useUserStore = create(
 
             resetUser: () => {
                 set({
-                    xp: 0,
-                    level: 1,
-                    currentStreak: 0,
-                    longestStreak: 0,
-                    lastDailyPlayed: null,
-                    favoriteCategories: [],
-                    questionsAnswered: 0,
-                    correctAnswers: 0,
-                    tensCompleted: 0,
-                    perfectTens: 0,
-                    rewardsEarned: 0,
-                    completedAttemptIds: []
+                    ...INITIAL_USER_STATE
                 })
             }
         }),
         {
             name: 'tenupz-user',
-            storage: createJSONStorage(() => Storage)
+            storage: createJSONStorage(() => Storage),
+            version: USER_STORE_VERSION,
+            migrate: (persistedState, version) => {
+                if (!persistedState) {
+                    return {
+                        ...INITIAL_USER_STATE
+                    }
+                }
+
+                return {
+                    ...INITIAL_USER_STATE,
+                    ...persistedState
+                }
+            }
         }
     )
 )

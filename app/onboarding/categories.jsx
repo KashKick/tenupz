@@ -5,8 +5,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { COLORS } from "../../constants/theme"
 import { CATEGORIES } from "../../constants/categories"
 import { useUserStore } from "../../stores/userStore"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
 
 export default function CategoriesOnboardingScreen() {
+    const contentPadding = useScreenPadding({ top: 48, bottom: 48 })
     const [selectedCategories, setSelectedCategories] = useState([])
 
     const toggleCategory = (categoryId) => {
@@ -28,7 +30,7 @@ export default function CategoriesOnboardingScreen() {
 
 
     return (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
             <View style={styles.header}>
                 <Text style={styles.eyebrow}>
                     MAKE IT YOURS

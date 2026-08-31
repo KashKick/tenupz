@@ -1,15 +1,33 @@
 import { router } from "expo-router"
 import { Gamepad2, Play } from "lucide-react-native"
-import { ScrollView, StyleSheet, View, Text, Pressable } from "react-native"
+import { ScrollView, StyleSheet, View, Text, Pressable, Image } from "react-native"
 import { COLORS } from "../../constants/theme"
 import { CATEGORIES } from "../../constants/categories"
 import { useUserStore } from "../../stores/userStore"
+import { useUserGames } from "../../hooks/useUserGames"
+import { useScreenPadding } from "../../hooks/useScreenPadding"
+import { formatReward } from "../../services/B2BService"
 
 export default function HomeScreen() {
+    const contentPadding = useScreenPadding({ top: 32 })
     const favoriteCategories = useUserStore((state) => state.favoriteCategories)
+
+    const personalizedCategories = favoriteCategories.length > 0 
+    ? CATEGORIES.filter((category) => favoriteCategories.includes(category.id))
+    : CATEGORIES
+
+    const userId = useUserStore((state) => state.userId)
     const xp = useUserStore((state) => state.xp)
     const level = useUserStore((state) => state.level)
     const currentStreak = useUserStore((state) => state.currentStreak)
+    const lastDailyPlayed = useUserStore((state) => state.lastDailyPlayed)
+
+    const today = new Date().toLocaleDateString('en-CA')
+    const dailyCompleted = lastDailyPlayed === today
+
+    const { inProgress: activeChallenges, loading: challengesLoading } = useUserGames(userId)
+
+    const activeChallenge = activeChallenges[0]
 
     const handleDailyTen = () => {
         router.push('/quiz/first-ten')
@@ -20,7 +38,7 @@ export default function HomeScreen() {
     }
 
     return (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
             <View style={styles.header}>
                 <Text style={styles.logo}>
                     TenUpz
@@ -63,11 +81,11 @@ export default function HomeScreen() {
                     </View>
 
                     <Text style={styles.dailyTitle}>
-                        Think you can go 10 for 10?
+                        {dailyCompleted ? 'Today\'s Ten complete!' : 'Think you can go 10 for 10?'}
                     </Text>
 
                     <Text style={styles.dailyDescription}>
-                        Today's questions are waiting.
+                        {dailyCompleted ? 'Come back tomorrow for another Ten.' : 'Today\'s questions are waiting.'}
                     </Text>
 
                     <View style={styles.dailyMeta}>
@@ -82,15 +100,23 @@ export default function HomeScreen() {
                         </Text>
                     </View>
 
-                    <Pressable onPress={handleDailyTen} style={({ pressed }) => [
-                        styles.dailyButton,
-                        pressed && styles.dailyButtonPressed,
-                    ]}>
-                        <Play size={20} fill={COLORS.primary} color={COLORS.primary} />
-                        <Text style={styles.dailyButtonText}>
-                            PLAY TODAY'S TEN
-                        </Text>
-                    </Pressable>
+                    {dailyCompleted ? (
+                        <View style={styles.dailyCompleted}>
+                            <Text style={styles.dailyCompletedText}>
+                                COMPLETED TODAY
+                            </Text>
+                        </View>
+                    ) : (
+                        <Pressable onPress={handleDailyTen} style={({ pressed }) => [
+                            styles.dailyButton,
+                            pressed && styles.dailyButtonPressed,
+                        ]}>
+                            <Play size={20} fill={COLORS.primary} color={COLORS.primary} />
+                            <Text style={styles.dailyButtonText}>
+                                PLAY TODAY'S TEN
+                            </Text>
+                        </Pressable>
+                    )}
                 </View>
             </View>
 
@@ -108,7 +134,7 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={styles.categories}>
-                    {CATEGORIES.slice(0, 8).map((category) => {
+                    {personalizedCategories.map((category) => {
                         const Icon = category.icon
 
                         return (
@@ -142,21 +168,62 @@ export default function HomeScreen() {
                     ACTIVE CHALLENGE
                 </Text>
 
-                <View style={styles.challengeCard}>
-                    <View style={styles.challengeIcon}>
-                        <Gamepad2 size={25} strokeWidth={2.5} color={COLORS.primary} />
-                    </View>
-
-                    <View style={styles.challengeContent}>
-                        <Text style={styles.challengeTitle}>
-                            No active challenge yet
-                        </Text>
-
+                {challengesLoading ? (
+                    <View style={styles.challengeCard}>
                         <Text style={styles.challengeText}>
-                            Complete Tens to unlock sponsored challenges.
+                            Loading challenge...
                         </Text>
                     </View>
-                </View>
+                ) : activeChallenge ? (
+                    <Pressable onPress={() => router.push(`/challenge/${activeChallenge.id}`)} 
+                        style={({ pressed }) => [
+                            styles.challengeCard,
+                            pressed && styles.challengeCardPressed
+                        ]}>
+                            {activeChallenge.squareImage ? (
+                                <Image source={{ uri: activeChallenge.squareImage }} style={styles.challengeImage} />
+                            ) : (
+                                <View style={styles.challengeIcon}>
+                                    <Gamepad2 size={25} strokeWidth={2.5} color={COLORS.primary} />
+                                </View>
+                            )}
+
+                            <View style={styles.challengeContent}>
+                                <Text style={styles.challengeTitle}>
+                                    {activeChallenge.title}
+                                </Text>
+
+                                <Text style={styles.challengeText}>
+                                    {activeChallenge.challengeStatus === 'pending'
+                                        ? 'Waiting for tracking...'
+                                        : `${activeChallenge.goals?.filter(
+                                            (goal) => goal.completed
+                                        ).length || 0} of ${
+                                            activeChallenge.goals?.length || 0
+                                        } milestones completed`}
+                                </Text>
+
+                                <Text style={styles.challengeReward}>
+                                    Earn up to{' '}
+                                    {formatReward(activeChallenge.currency, activeChallenge.amount)}
+                                </Text>
+                            </View>
+                        </Pressable>
+                ) : (
+                    <View style={styles.challengeCard}>
+                        <View style={styles.challengeIcon}>
+                            <Gamepad2 size={25} strokeWidth={2.5} color={COLORS.primary} />
+                        </View>
+                        <View style={styles.challengeContent}>
+                            <Text style={styles.challengeTitle}>
+                                No active challenge yet
+                            </Text>
+                            <Text style={styles.challengeText}>
+                                Start a challenge from Rewards and it'll show up here.
+                            </Text>
+                        </View>
+                    </View>
+                )}
             </View>
         </ScrollView>
     )
@@ -369,5 +436,37 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         fontSize: 14,
         lineHeight: 19
-    }
+    },
+    challengeImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 15
+    },
+
+    challengeReward: {
+        marginTop: 6,
+        color: COLORS.primary,
+        fontSize: 13,
+        fontWeight: "800"
+    },
+
+    challengeCardPressed: {
+        transform: [{ translateY: 2 }]
+    },
+    dailyCompleted: {
+        minHeight: 56,
+        marginTop: 20,
+        paddingHorizontal: 18,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+
+    dailyCompletedText: {
+        color: COLORS.surface,
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 0.4
+    },
 })
