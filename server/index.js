@@ -1,7 +1,8 @@
 import express from 'express'
 
 const app = express()
-const PORT = 3001
+const PORT = process.env.PORT || 3001
+const UPSTREAM_TIMEOUT_MS = 10000
 
 app.use((req, res, next) => {
     const origin = req.headers.origin
@@ -16,94 +17,6 @@ app.use((req, res, next) => {
     }
 
     next()
-})
-
-app.get('/api/games', async(req, res) => {
-    try {
-        const partnerId = process.env.BESITOS_PARTNER_ID
-        const token = process.env.BESITOS_API_TOKEN
-
-        if (!partnerId || !token) {
-            return res.status(500).json({
-                error: 'Missing Besitos credentials'
-            })
-        }
-
-        const response = await fetch(
-            `https://wall.besitos.ai/data/partner/offers/${partnerId}?device_platform=all`,
-            {
-                headers: {
-                    accept: 'application/json',
-                    authorization: `Bearer ${token}`
-                }
-            }
-        )
-
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: `Besitos API return ${response.status}`
-            })
-        }
-
-        const data = await response.json()
-
-        res.json(data)
-    } catch (error) {
-        res.status(500).json({
-            error: 'Failed to reach Besitos API',
-            details: error.message
-        })
-    }
-})
-
-app.get('/api/games/:offerId', async (req, res) => {
-    try {
-        const partnerId = process.env.BESITOS_PARTNER_ID
-        const token = process.env.BESITOS_API_TOKEN
-        const { offerId } = req.params
-
-        if (!partnerId || !token) {
-            return res.status(500).json({
-                error: 'Missing Besitos credentials'
-            })
-        }
-
-        const response = await fetch(
-            `https://wall.besitos.ai/data/partner/offers/${partnerId}?device_platform=all`,
-            {
-                headers: {
-                    accept: 'application/json',
-                    authorization: `Bearer ${token}`
-                }
-            }
-        )
-
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: `Besitos API returned ${response.status}`
-            })
-        }
-
-        const json = await response.json()
-
-        const offers = Array.isArray(json.data) ? json.data : []
-
-        const offer = offers.find((item) => item.id === offerId && item.budget_status === 'Active')
-
-        if (!offer) {
-            return res.status(404).json({
-                error: 'Offer not found'
-            })
-        }
-
-        res.json({ offer })
-
-    } catch (error) {
-        res.status(500).json({
-            error: 'Failed to reach Besitos API',
-            details: error.message
-        })
-    }
 })
 
 app.get('/api/user-games/:userId', async (req, res) => {
@@ -149,7 +62,8 @@ app.get('/api/user-games/:userId', async (req, res) => {
                 headers: {
                     accept: 'application/json',
                     authorization: `Bearer ${token}`
-                }
+                },
+                signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
             }
         )
 
@@ -208,7 +122,9 @@ app.get('/api/user-games/:userId', async (req, res) => {
     } catch (error) {
         console.error(error)
 
-        res.status(500).json({
+        const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError'
+
+        res.status(timedOut ? 504 : 500).json({
             error: 'Unable to load rewards right now',
         })
     }

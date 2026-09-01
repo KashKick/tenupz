@@ -1,7 +1,7 @@
 import { useLocalSearchParams, router } from "expo-router"
-import { StyleSheet, Text, View, Image, Linking, Pressable, ScrollView, Platform } from "react-native"
+import { StyleSheet, Text, View, Image, Linking, Pressable, ScrollView, Platform, AppState } from "react-native"
 import { ArrowLeft, CheckCircle2, Circle, ExternalLink, ChevronDown, ChevronUp, XCircle } from "lucide-react-native"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { COLORS } from "../../constants/theme"
 import { formatReward, getUserOffer } from "../../services/B2BService"
 import Spinner from "../../components/Spinner"
@@ -20,40 +20,77 @@ export default function ChallengeScreen() {
 
   const userId = useUserStore((state) => state.userId)
 
+  const appState = useRef(AppState.currentState)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const markChallengeLaunched = useChallengeStore((state) => state.markChallengeLaunched)
   const launchedChallenges = useChallengeStore((state) => state.launchedChallenges)
   const isLocallyLaunched = launchedChallenges.some((challenge) => challenge.id === offer?.id)
 
   const platform = Platform.OS === 'ios' ? 'ios' : 'android'
 
-  useEffect(() => {
-    let alive = true
+  const loadOffer = useCallback(
+    async ({ force = false } = {}) => {
+      if (!userId) return
 
-    async function loadOffer() {
       try {
-        setLoading(true)
+        if (!force) {
+          setLoading(true)
+        }
+
         setError(null)
 
-        if (!userId) return
+        const result = await getUserOffer(userId, offerId, { platform, country: 'US', force })
 
-        const result = await getUserOffer(userId, offerId, { platform, country: 'US'})
+        if (!mountedRef.current) return
 
-        if (alive) setOffer(result)
-
+        setOffer(result)
       } catch (err) {
-        if (alive) {
-          setError(err.message)
+        if (!mountedRef.current) return
+
+        setError(err.message)
+
+        if (!force) {
           setOffer(null)
         }
       } finally {
-        if (alive) setLoading(false)
+        if (mountedRef.current && !force) {
+          setLoading(false)
+        }
       }
-    }
+    }, 
+    [userId, offerId, platform])
 
+  useEffect(() => {
     loadOffer()
+  }, [loadOffer])
 
-    return () => { alive = false }
-  }, [offerId, userId])
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      'change',
+    (nextState) => {
+      const wasAway = appState.current === 'background'
+
+      if (wasAway && nextState === 'active') {
+        loadOffer({ force: true })
+      }
+
+      appState.current = nextState
+    }
+    )
+
+    return () => {
+      subscription.remove()
+    }
+  }, [loadOffer])
 
   const handleChallengePress = async () => {
     if (!offer?.url) return
@@ -73,7 +110,7 @@ export default function ChallengeScreen() {
     )
   }
 
-  if (error || !offer) {
+  if (!offer) {
     return (
       <View style={[styles.stateScreen, statePadding]}>
         <Text style={styles.stateTitle}>

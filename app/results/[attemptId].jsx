@@ -23,7 +23,10 @@ export default function ResultsScreen() {
   const numericXp = Number(xp || 0)
 
   const isPerfect = numericScore === 10
-  const isFirstTen = quizId === 'first-ten'
+  const isDailyTen = quizId === 'first-ten'
+
+  const favoriteCategories = useUserStore((state) => state.favoriteCategories)
+  const needsOnboarding = favoriteCategories.length === 0
 
   const addQuizResult = useUserStore((state) => state.addQuizResult)
 
@@ -32,7 +35,7 @@ export default function ResultsScreen() {
         attemptId,
         score: numericScore,
         xpEarned: numericXp,
-        isDaily: isFirstTen,
+        isDaily: isDailyTen,
     })
   }, [])
 
@@ -69,7 +72,7 @@ export default function ResultsScreen() {
   }
 
   const handleContinue = () => {
-    if (isFirstTen) {
+    if (needsOnboarding) {
         router.push('/onboarding/categories')
         return
     }
@@ -81,7 +84,7 @@ export default function ResultsScreen() {
     try {
         await Share.share({
             message:
-            `I scored ${numericScore}/10 on TenUpz!` +
+            `I scored ${numericScore}/10 on TenUpz! ` +
             `Think you can beat me?`
         })
     } catch (error) {
@@ -191,7 +194,7 @@ export default function ResultsScreen() {
                             pressed && styles.notNowButtonPressed
                         ]}>
                             <Text style={styles.notNowText}>
-                                NOW NOW
+                                NOT NOW
                             </Text>
                         </Pressable>
             </View>
@@ -203,7 +206,7 @@ export default function ResultsScreen() {
                 pressed && styles.primaryButtonPressed
             ]}>
                 <Text style={styles.primaryButtonText}>
-                    {isFirstTen ? 'CONTINUE' : 'PLAY ANOTHER'}
+                    {needsOnboarding ? 'CONTINUE' : 'PLAY ANOTHER'}
                 </Text>
 
                 <ArrowRight size={20} strokeWidth={2.7} color={COLORS.surface} />

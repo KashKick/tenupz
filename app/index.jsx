@@ -1,13 +1,19 @@
-import { router } from 'expo-router'
+import { Redirect, router } from 'expo-router'
 import { StyleSheet, Text, View, Pressable, } from 'react-native'
 import { COLORS } from '../constants/theme'
 import { useScreenPadding } from '../hooks/useScreenPadding'
+import { useUserStore } from '../stores/userStore'
 
 export default function WelcomeScreen() {
     const screenPadding = useScreenPadding({ top: 24, bottom: 24 })
+    const tensCompleted = useUserStore((state) => state.tensCompleted)
 
     const handleStart = () => {
         router.push("/quiz/first-ten")
+    }
+    
+    if (tensCompleted > 0) {
+        return <Redirect href="/home" />
     }
 
   return (

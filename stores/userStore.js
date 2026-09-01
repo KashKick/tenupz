@@ -25,7 +25,7 @@ const getLevelFromXp = (xp) => {
     return Math.floor(xp / 1000) + 1
 }
 
-const getLocalDataString = (date = new Date()) => {
+const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
@@ -37,7 +37,7 @@ const getYesterdayDateString = () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    return getLocalDataString(yesterday)
+    return getLocalDateString(yesterday)
 }
 
 export const useUserStore = create(
@@ -76,7 +76,7 @@ export const useUserStore = create(
                     let newLastDailyPlayed = state.lastDailyPlayed
 
                     if (isDaily) {
-                        const today = getLocalDataString()
+                        const today = getLocalDateString()
                         const yesterday = getYesterdayDateString()
 
                         if ( state.lastDailyPlayed === today) {

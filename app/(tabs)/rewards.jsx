@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, ScrollView, Pressable, Image } from "react-native"
+import { StyleSheet, Text, View, ScrollView, Pressable, Image, RefreshControl } from "react-native"
 import { CheckCircle2, ChevronRight, Gift, Gamepad2 } from "lucide-react-native"
 import { COLORS } from "../../constants/theme"
 import { formatReward } from "../../services/B2BService"
@@ -16,11 +16,16 @@ export default function RewardsScreen() {
     inProgress: activeChallenges,
     completed: completedChallenges,
     loading,
-    error
+    refreshing,
+    error,
+    refresh
   } = useUserGames(userId)
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, contentPadding]} 
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
+    }>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>
           REWARDS
@@ -202,7 +207,6 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     alignSelf: 'center',
     paddingHorizontal: 24,
-    paddingTop: 32,
     paddingBottom: 120
   },
   header: {

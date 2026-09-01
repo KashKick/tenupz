@@ -2,45 +2,6 @@ import { applyDevSimulation } from "./devChallengeSimulation"
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || ""
 
-export function normalizeOffer(offer) {
-  const categories = (offer.categories || [])
-    .map((category) =>
-      typeof category === 'string' ? category : category?.name,
-    )
-    .filter(Boolean)
-
-  return {
-    id: offer.id,
-    title: offer.title,
-    tagline: offer.card_text || '',
-    image: offer.image || offer.square_image || offer.large_image || '',
-    squareImage: offer.square_image || offer.image || offer.large_image || '',
-    largeImage: offer.large_image || offer.image || offer.square_image || '',
-    currency: offer.amount_currency || '$',
-    amount: offer.amount != null ? Number(offer.amount) : '',
-    category: categories[0] || 'Game',
-    categories,
-    isNew: offer.is_new,
-    device: offer.device || null,
-    url: offer.url,
-    points: offer.points || [],
-    goals: (offer.goals || []).map((goal) => ({
-      id: goal.goal_id,
-      text: goal.text,
-      amount: goal.amount,
-      currency: goal.amount_currency || offer.amount_currency || '$',
-      daysLeft: goal.days_left,
-      section: goal.section,
-      position: goal.position,
-      completed: Boolean(goal.completed),
-      failed: Boolean(goal.failed),
-      completedDatetime: goal.completed_datetime || null,
-      expiresAt: goal.expires_at || null,
-      expireDatetime: goal.expire_datetime || null
-    })),
-  }
-}
-
 export function getRecommendedOffersForPlatform(offers, platform) {
     if (platform === 'ios' || platform === 'android') {
         return offers.filter((offer) => offer.device === platform)
@@ -86,69 +47,76 @@ export function formatReward(currency = '$', amount = 0) {
   return withCurrency(currency, formatAmount(value))
 }
 
-export async function getEligibleOffers() {
-    const response = await fetch(`${API_BASE}/api/games`,
-    {
-        headers: {
-            accept: 'application/json'
-        }
-    })
+const REQUEST_TIMEOUT_MS = 12000
+const USER_GAMES_TTL_MS = 60000
+const userGamesCache = new Map()
+const inFlightRequests = new Map()
 
-    if (!response.ok) {
-        throw new Error(
-            `/api/games returned ${response.status}`
-        )
-    }
-
-    const json = await response.json()
-    const offers = Array.isArray(json.data) ? json.data : []
-
-    const activeOffers = offers.filter((offer) => offer.budget_status === 'Active')
-
-    return activeOffers.map(normalizeOffer)
+export function clearUserGamesCache() {
+    userGamesCache.clear()
 }
 
-export async function getOfferDetails(offerId) {
-    const response = await fetch(`${API_BASE}/api/games/${encodeURIComponent(offerId)}`,
-    {
-        headers: {
-            accept: 'application/json'
+async function fetchJson(url) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                accept: 'application/json'
+            },
+            signal: controller.signal
+        })
+
+        if (!response.ok) {
+            throw new Error('Unable to load rewards right now')
         }
-    })
 
-    if (!response.ok) {
-        throw new Error(
-            `Offer request returned ${response.status}`
-        )
+        return await response.json()
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out. Check your connection and try again.')
+        }
+
+        throw error
+    } finally {
+        clearTimeout(timeout)
     }
-
-    const json = await response.json()
-
-    return normalizeOffer(json.offer)
 }
 
-export async function getUserGames(userId, { platform = 'android', country = 'US' } = {}) {
+export async function getUserGames(userId, { platform = 'android', country = 'US', force = false } = {}) {
     const params = new URLSearchParams({
         platform,
         country
     })
 
-    const response = await fetch(
-        `${API_BASE}/api/user-games/${encodeURIComponent(userId)}?${params.toString()}`,
-        {
-            headers: {
-                accept: 'application/json'
-            }
-        }
-    )
+    const key = `${userId}|${platform}|${country}`
 
-    if (!response.ok) {
-        throw new Error(
-            'Unable to load rewards right now'
-        )
+    if (inFlightRequests.has(key)) {
+        return inFlightRequests.get(key)
     }
 
-    return response.json()
+    const cached = userGamesCache.get(key)
+
+    if (!force && cached && Date.now() - cached.timestamp < USER_GAMES_TTL_MS) {
+        return cached.data
+    }
+
+    const promise = fetchJson(
+        `${API_BASE}/api/user-games/${encodeURIComponent(userId)}?${params.toString()}`
+    ).then((data) => {
+        userGamesCache.set(key, {
+            timestamp: Date.now(),
+            data
+        })
+        return data
+    }).finally(() => {
+        inFlightRequests.delete(key)
+    })
+
+    inFlightRequests.set(key, promise)
+
+    return promise
 }
 
 export async function getUserOffer(userId, offerId, options = {}) {
