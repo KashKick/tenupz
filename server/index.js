@@ -1,4 +1,5 @@
 import express from 'express'
+import { db } from './db/pool.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -129,6 +130,85 @@ app.get('/api/user-games/:userId', async (req, res) => {
         })
     }
 })
+
+app.get('/api/quizzes/daily', async (req, res) => {
+    try {
+        const quizResult = await db.query(
+            `
+            SELECT
+                q.id AS quiz_id,
+                q.type,
+                q.date,
+                qq.position,
+                qu.id AS question_id,
+                qu.category_id,
+                qu.difficulty,
+                qu.question,
+                qu.answer_1,
+                qu.answer_2,
+                qu.answer_3,
+                qu.answer_4
+            FROM quizzes q
+            JOIN quiz_questions qq
+                ON qq.quiz_id = q.id
+            JOIN questions qu
+                ON qu.id = qq.question_id
+            WHERE q.id = (
+                SELECT id
+                FROM quizzes
+                WHERE type = 'daily'
+                ORDER BY date DESC NULLS LAST, created_at DESC
+                LIMIT 1
+            )
+            ORDER BY qq.position ASC
+            `
+        )
+
+        if (quizResult.rows.length === 0) {
+            return res.status(404).json({
+                error: 'No Daily Ten available'
+            })
+        }
+
+        const firstRow = quizResult.rows[0]
+
+        res.json({
+            id: firstRow.quiz_id,
+            type: firstRow.type,
+            date: firstRow.date ? firstRow.date.toISOString().slice(0, 10) : null,
+            questions: quizResult.rows.map((row) => ({
+                id: row.question_id,
+                categoryId: row.category_id,
+                difficulty: row.difficulty,
+                question: row.question,
+                answers: [
+                    { id: 1, text: row.answer_1 },
+                    { id: 2, text: row.answer_2 },
+                    { id: 3, text: row.answer_3 },
+                    { id: 4, text: row.answer_4 },
+                ]
+            }))
+        })
+    } catch (error) {
+        console.error('Daily quiz error:', error)
+
+        res.status(500).json({
+            error: 'Unable to load Daily Ten'
+        })
+    }
+})
+
+async function testDatabaseConnection() {
+    try {
+        const result = await db.query('SELECT NOW()')
+
+        console.log('Postgres connected', result.rows[0].now)
+    } catch (error) {
+        console.error('Postgres connection failed', error)
+    }
+}
+
+testDatabaseConnection()
 
 app.listen(PORT, () => {
     console.log(`TenUpz local API running at http://localhost:${PORT}`)
